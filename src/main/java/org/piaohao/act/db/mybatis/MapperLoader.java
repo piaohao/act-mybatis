@@ -24,8 +24,8 @@ public class MapperLoader implements GenericTypedBeanLoader<BaseMapper> {
             String dbId = DbServiceManager.dbId(modelType);
             DbService service = Act.app().dbServiceManager().dbService(dbId);
             if (service instanceof MybatisService) {
-                MybatisService beetl = $.cast(service);
-                return $.cast(beetl.mapper(modelType));
+                MybatisService mybatisService = $.cast(service);
+                return $.cast(mybatisService.mapper(modelType));
             }
         }
         return null;
