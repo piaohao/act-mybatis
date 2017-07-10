@@ -61,12 +61,12 @@ public class MybatisService extends SqlDbService {
 
     @Override
     public <DAO extends Dao> DAO defaultDao(Class<?> aClass) {
-        throw E.unsupport("BeetlSql does not support DAO. Please use mapper instead");
+        throw E.unsupport("Mybatis does not support DAO. Please use mapper instead");
     }
 
     @Override
     public <DAO extends Dao> DAO newDaoInstance(Class<DAO> aClass) {
-        throw E.unsupport("BeetlSql does not support DAO. Please use mapper instead");
+        throw E.unsupport("Mybatis does not support DAO. Please use mapper instead");
     }
 
     @Override
@@ -77,7 +77,7 @@ public class MybatisService extends SqlDbService {
     @Override
     protected void releaseResources() {
         if (_logger.isDebugEnabled()) {
-            _logger.debug("beetsql shutdown: %s", id());
+            _logger.debug("Mybatis shutdown: %s", id());
         }
         super.releaseResources();
     }
