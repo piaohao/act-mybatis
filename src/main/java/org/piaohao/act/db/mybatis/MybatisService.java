@@ -86,6 +86,10 @@ public class MybatisService extends SqlDbService {
         return mapperMap.get(mapperClass);
     }
 
+    SqlSession sqlSession(){
+        return sqlSession;
+    }
+
     @SuppressWarnings("unchecked")
     public void prepareMapperClass(Class<? extends BaseMapper> mapperClass) {
         if (sqlSession == null) {
