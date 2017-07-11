@@ -6,6 +6,7 @@ import act.db.Dao;
 import act.db.sql.DataSourceConfig;
 import act.db.sql.SqlDbService;
 import org.apache.ibatis.binding.MapperProxy;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -20,17 +21,23 @@ import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
+import static java.lang.reflect.Proxy.newProxyInstance;
+import static org.apache.ibatis.reflection.ExceptionUtil.unwrapThrowable;
 
 /**
  * Implement `act.db.DbService` using Mybatis
  */
 public class MybatisService extends SqlDbService {
     private SqlSessionFactory sqlSessionFactory;
-    private SqlSession sqlSession;
+    //    private SqlSession sqlSession;
+    private SqlSession sqlSessionProxy;
     private ConcurrentMap<Class, Object> mapperMap = new ConcurrentHashMap<>();
 
     public MybatisService(String dbId, App app, Map<String, String> config) {
@@ -47,6 +54,10 @@ public class MybatisService extends SqlDbService {
             e.printStackTrace();
         }
         sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
+        this.sqlSessionProxy = (SqlSession) newProxyInstance(
+                SqlSessionFactory.class.getClassLoader(),
+                new Class[]{SqlSession.class},
+                new SqlSessionInterceptor());
     }
 
     @Override
@@ -86,18 +97,11 @@ public class MybatisService extends SqlDbService {
         return mapperMap.get(mapperClass);
     }
 
-    SqlSession sqlSession(){
-        return sqlSession;
-    }
-
     @SuppressWarnings("unchecked")
     public void prepareMapperClass(Class<? extends BaseMapper> mapperClass) {
-        if (sqlSession == null) {
-            sqlSession = sqlSessionFactory.openSession();
-        }
         BaseMapper mapperBean = null;
         try {
-            MapperProxy mapperProxy = new MapperProxy(sqlSession, mapperClass, new ConcurrentHashMap<>());
+            MapperProxy mapperProxy = new MapperProxy(sqlSessionProxy, mapperClass, new ConcurrentHashMap<>());
             mapperBean = $.cast(Proxy.newProxyInstance(mapperClass.getClassLoader(), new Class[]{mapperClass}, mapperProxy));
         } catch (Exception e) {
             return;
@@ -108,4 +112,22 @@ public class MybatisService extends SqlDbService {
         genie.registerProvider(mapperClass, (Provider) () -> finalMapperBean);
     }
 
+    private class SqlSessionInterceptor implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            SqlSession sqlSession = sqlSessionFactory.openSession();
+            try {
+                Object result = method.invoke(sqlSession, args);
+                sqlSession.commit(true);
+                return result;
+            } catch (Throwable t) {
+                Throwable unwrapped = unwrapThrowable(t);
+                throw unwrapped;
+            } finally {
+                if (sqlSession != null) {
+                    sqlSession.close();
+                }
+            }
+        }
+    }
 }
